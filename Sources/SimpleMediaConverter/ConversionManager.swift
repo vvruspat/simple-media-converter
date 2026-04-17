@@ -32,7 +32,7 @@ final class ConversionManager {
         process.arguments = [
             "-y",
             "-i", input.path,
-            "-af", "aresample=dither_method=triangular_hp",
+            "-af", "aresample=dither_method=shibata,aformat=sample_fmts=s16p",
             "-codec:a", "libmp3lame",
             "-b:a", "\(bitrate)k",
             output.path
