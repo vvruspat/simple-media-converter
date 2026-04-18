@@ -95,6 +95,11 @@ final class ConversionQueue {
                     }
                 }
             }
+            // Reveal all converted files in Finder
+            let doneURLs = self.jobs.filter { $0.state == .done }.map(\.outputURL)
+            if !doneURLs.isEmpty {
+                NSWorkspace.shared.activateFileViewerSelecting(doneURLs)
+            }
             self.isRunning = false
         }
     }
