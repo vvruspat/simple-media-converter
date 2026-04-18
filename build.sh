@@ -43,7 +43,7 @@ cat > "$BUNDLE/Contents/Info.plist" << 'PLIST'
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>         <string>SimpleMediaConverter</string>
-    <key>CFBundleIdentifier</key>         <string>com.user.simple-media-converter</string>
+    <key>CFBundleIdentifier</key>         <string>com.vvruspat.simple-media-converter</string>
     <key>CFBundleName</key>               <string>SimpleMediaConverter</string>
     <key>CFBundleDisplayName</key>        <string>WAV → MP3</string>
     <key>CFBundleIconFile</key>           <string>AppIcon</string>
