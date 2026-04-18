@@ -3,8 +3,8 @@
 <plist version="1.0">
 <dict>
     <!--
-        Hardened Runtime — минимальный набор для non-sandboxed app.
-        Sandbox намеренно ВЫКЛЮЧЕН: нужен свободный доступ к файлам пользователя.
+        Hardened Runtime — minimal entitlements for a non-sandboxed app.
+        Sandbox is intentionally OFF: the app needs unrestricted access to user files.
     -->
     <key>com.apple.security.cs.allow-jit</key>
     <false/>
