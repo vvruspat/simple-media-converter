@@ -39,11 +39,11 @@ final class ConversionJob: Identifiable {
 
     var statusLabel: String {
         switch state {
-        case .waiting:        "В очереди"
+        case .waiting:        "Queued"
         case .converting:     String(format: "%.0f%%", progress * 100)
         case .done:           "✓ \(outputURL.lastPathComponent)"
-        case .failed(let m):  "Ошибка: \(m)"
-        case .cancelled:      "Отменено"
+        case .failed(let m):  "Error: \(m)"
+        case .cancelled:      "Cancelled"
         }
     }
 

@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 import AppKit
 
-// MARK: - Queue Panel (left side)
+// MARK: - Queue Panel
 
 struct QueuePanel: View {
     let queue: ConversionQueue
@@ -27,12 +27,12 @@ struct QueuePanel: View {
 
     private var emptyState: some View {
         VStack(spacing: 12) {
-            Image(systemName: "waveform.badge.plus")
+            Image(systemName: "film.stack")
                 .font(.system(size: 44, weight: .ultraLight))
                 .foregroundStyle(.secondary)
-            Text("Drop WAV files here")
+            Text("Drop media files here")
                 .font(.headline)
-            Text("16 / 24 / 32-bit · multiple files supported")
+            Text("Audio & video · any format ffmpeg supports")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -105,10 +105,10 @@ struct QueuePanel: View {
 
     private func addFilesViaPicker() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes   = [.wav]
+        panel.allowedContentTypes    = [.audiovisualContent]
         panel.allowsMultipleSelection = true
         panel.canChooseFiles          = true
-        panel.title = "Choose WAV files"
+        panel.title = "Choose media files"
         guard panel.runModal() == .OK else { return }
         queue.add(urls: panel.urls)
     }
@@ -145,7 +145,6 @@ struct JobRow: View {
 
             Spacer(minLength: 8)
 
-            // Remove button — always visible when hovered or terminal
             Button(action: onRemove) {
                 Image(systemName: "xmark")
                     .font(.caption)
@@ -187,9 +186,9 @@ struct JobRow: View {
 
     private var labelStyle: Color {
         switch job.state {
-        case .done:    .green
-        case .failed:  .red
-        default:       .secondary
+        case .done:   .green
+        case .failed: .red
+        default:      .secondary
         }
     }
 }

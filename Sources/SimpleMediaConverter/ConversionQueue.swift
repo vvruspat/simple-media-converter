@@ -13,6 +13,16 @@ final class ConversionQueue {
     private var conversionTask: Task<Void, Never>?
     private var processes: [UUID: Process] = [:]
 
+    // MARK: - Supported input extensions
+
+    private static let supportedExtensions: Set<String> = [
+        // Audio
+        "mp3", "aac", "m4a", "flac", "wav", "aiff", "aif", "ogg", "opus", "wma", "alac",
+        // Video
+        "mp4", "mkv", "mov", "webm", "avi", "m4v", "wmv", "flv", "ts", "mts", "m2ts",
+        "3gp", "ogv", "mpg", "mpeg", "vob", "f4v", "divx", "rm", "rmvb"
+    ]
+
     // MARK: - FFmpeg
 
     var ffmpegPath: String? {
@@ -38,8 +48,9 @@ final class ConversionQueue {
 
     func add(urls: [URL]) {
         let existing = Set(jobs.map { $0.inputURL.standardizedFileURL })
-        for url in urls where url.pathExtension.lowercased() == "wav"
-                                && !existing.contains(url.standardizedFileURL) {
+        for url in urls
+            where Self.supportedExtensions.contains(url.pathExtension.lowercased())
+               && !existing.contains(url.standardizedFileURL) {
             jobs.append(ConversionJob(inputURL: url, outputURL: url))
         }
     }
@@ -65,7 +76,7 @@ final class ConversionQueue {
     func startAll(preset: ConversionPreset) {
         guard let ffmpeg = ffmpegPath else {
             for job in jobs where job.state == .waiting {
-                job.state = .failed("ffmpeg не найден")
+                job.state = .failed("ffmpeg not found")
             }
             return
         }
@@ -95,7 +106,6 @@ final class ConversionQueue {
                     }
                 }
             }
-            // Reveal all converted files in Finder
             let doneURLs = self.jobs.filter { $0.state == .done }.map(\.outputURL)
             if !doneURLs.isEmpty {
                 NSWorkspace.shared.activateFileViewerSelecting(doneURLs)
@@ -120,27 +130,40 @@ final class ConversionQueue {
     private func runJob(_ job: ConversionJob,
                         ffmpeg: String,
                         preset: ConversionPreset) async {
-        // 1. Probe duration (suspends, does NOT block main thread)
-        let duration = await probeDuration(url: job.inputURL, ffmpeg: ffmpeg)
+        // 1. Probe duration + stream info
+        print("[runJob] probing \(job.inputURL.lastPathComponent)")
+        let (duration, hasVideo) = await probeMedia(url: job.inputURL, ffmpeg: ffmpeg)
+        print("[runJob] probe done: duration=\(duration) hasVideo=\(hasVideo)")
         job.duration = duration
-        job.state    = .converting
 
-        // 2. Build arguments
-        var args: [String] = ["-y", "-i", job.inputURL.path]
-        args += preset.ditherMethod.ffmpegFilterArgs
-        args += ["-codec:a", "libmp3lame", "-b:a", "\(preset.bitrate)k", job.outputURL.path]
+        // 2. Guard: GIF requires video input
+        if preset.outputFormat == .gif && !hasVideo {
+            job.state = .failed("GIF requires a video source")
+            return
+        }
 
-        // 3. Launch process
+        job.state = .converting
+
+        // 3. Build arguments via preset
+        let args = preset.ffmpegArgs(
+            inputPath:     job.inputURL.path,
+            outputPath:    job.outputURL.path,
+            hasVideoInput: hasVideo
+        )
+        print("[runJob] args: \(args.joined(separator: " "))")
+
+        // 4. Launch process
         let process = Process()
         process.executableURL = URL(fileURLWithPath: ffmpeg)
         process.arguments = args
 
         let errPipe = Pipe()
-        process.standardOutput = Pipe()
+        process.standardInput  = FileHandle.nullDevice  // prevent ffmpeg waiting on stdin
+        process.standardOutput = FileHandle.nullDevice
         process.standardError  = errPipe
         processes[job.id] = process
 
-        // 4. Stream progress from stderr (fires on background thread)
+        // 5. Stream progress from stderr (fires on background thread)
         errPipe.fileHandleForReading.readabilityHandler = { [weak job] handle in
             let data = handle.availableData
             guard !data.isEmpty,
@@ -151,21 +174,27 @@ final class ConversionQueue {
             Task { @MainActor in j.progress = p }
         }
 
-        // 5. Run
+        // 6. Run
+        print("[runJob] launching ffmpeg…")
         do { try process.run() }
         catch {
             errPipe.fileHandleForReading.readabilityHandler = nil
             processes.removeValue(forKey: job.id)
             job.state = .failed(error.localizedDescription)
+            print("[runJob] launch error: \(error)")
             return
         }
+        print("[runJob] ffmpeg launched pid=\(process.processIdentifier), waiting…")
 
-        // 6. Await termination (suspends, does NOT block main thread)
+        // 7. Await termination
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            process.terminationHandler = { _ in cont.resume() }
+            process.terminationHandler = { p in
+                print("[runJob] ffmpeg exited status=\(p.terminationStatus)")
+                cont.resume()
+            }
         }
 
-        // 7. Cleanup (back on main actor)
+        // 8. Cleanup
         errPipe.fileHandleForReading.readabilityHandler = nil
         processes.removeValue(forKey: job.id)
 
@@ -177,22 +206,43 @@ final class ConversionQueue {
         }
     }
 
-    // MARK: - Duration probe
+    // MARK: - Media probe (duration + stream info)
+    //
+    // Intentionally avoids Pipe() — concurrent processes inherit each other's
+    // pipe write-ends, causing readDataToEndOfFile() to block forever.
+    // Temp-file redirect sidesteps all pipe-inheritance issues.
 
-    private func probeDuration(url: URL, ffmpeg: String) async -> Double {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: ffmpeg)
-        process.arguments = ["-i", url.path]
-        let pipe = Pipe()
-        process.standardError  = pipe
-        process.standardOutput = Pipe()
-        guard (try? process.run()) != nil else { return 0 }
+    private func probeMedia(url: URL, ffmpeg: String) async -> (duration: Double, hasVideo: Bool) {
+        return await withCheckedContinuation { cont in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let tmpPath = NSTemporaryDirectory() + "probe_\(UUID().uuidString).txt"
+                defer { try? FileManager.default.removeItem(atPath: tmpPath) }
 
-        return await withCheckedContinuation { (cont: CheckedContinuation<Double, Never>) in
-            process.terminationHandler = { _ in
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                let text = String(data: data, encoding: .utf8) ?? ""
-                cont.resume(returning: parseFFmpegDuration(text))
+                FileManager.default.createFile(atPath: tmpPath, contents: nil)
+                guard let writeHandle = try? FileHandle(forWritingTo: URL(fileURLWithPath: tmpPath)) else {
+                    cont.resume(returning: (0, false)); return
+                }
+
+                let process = Process()
+                process.executableURL  = URL(fileURLWithPath: ffmpeg)
+                process.arguments      = ["-i", url.path]
+                process.standardInput  = FileHandle.nullDevice  // prevent ffmpeg waiting on stdin
+                process.standardOutput = writeHandle
+                process.standardError  = writeHandle
+
+                guard (try? process.run()) != nil else {
+                    writeHandle.closeFile()
+                    cont.resume(returning: (0, false)); return
+                }
+
+                process.waitUntilExit()
+                writeHandle.closeFile()
+
+                let text     = (try? String(contentsOfFile: tmpPath)) ?? ""
+                let duration = parseFFmpegDuration(text)
+                let hasVideo = text.contains("Video:")
+                print("[probe] \(url.lastPathComponent) → duration=\(duration) hasVideo=\(hasVideo)")
+                cont.resume(returning: (duration, hasVideo))
             }
         }
     }

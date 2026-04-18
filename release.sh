@@ -6,7 +6,7 @@ DEVELOPER_ID="Developer ID Application: Aleksandr  Kolesov (3WKK5AGY66)"
 NOTARIZE_PROFILE="SMC-notarize"   # keychain profile name from setup_notarize.sh
 APP_NAME="SimpleMediaConverter"
 BUNDLE="$APP_NAME.app"
-VERSION="2.0"
+VERSION="2.1"
 
 # ─── Preflight checks ─────────────────────────────────────────────────────────
 echo "▸ Checking environment..."

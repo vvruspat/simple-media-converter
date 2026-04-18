@@ -36,7 +36,6 @@ struct SettingsSheet: View {
                 .onChange(of: store.selectedID) { _, _ in store.save() }
 
                 HStack(spacing: 8) {
-                    // New blank preset
                     Button {
                         var blank = ConversionPreset.default
                         blank.id   = UUID()
@@ -50,7 +49,6 @@ struct SettingsSheet: View {
                     .buttonStyle(.bordered)
                     .controlSize(.small)
 
-                    // Duplicate selected
                     Button {
                         newPresetName = store.selected.name + " Copy"
                         showNewSheet  = true
@@ -62,7 +60,6 @@ struct SettingsSheet: View {
 
                     Spacer()
 
-                    // Delete
                     Button(role: .destructive) {
                         store.deleteSelected()
                     } label: {
@@ -81,33 +78,84 @@ struct SettingsSheet: View {
             // ── Settings form ────────────────────────────────────────────
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
+
                     formField("Name") {
                         TextField("Preset name", text: bind(\.name))
                             .textFieldStyle(.roundedBorder)
                             .onSubmit { store.save() }
                     }
 
-                    formField("Bitrate") {
-                        Picker("", selection: bind(\.bitrate)) {
-                            Text("128 kbps").tag(128)
-                            Text("256 kbps").tag(256)
-                            Text("320 kbps").tag(320)
-                        }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                        .onChange(of: store.selected.bitrate) { _, _ in store.save() }
-                    }
-
-                    formField("Dither") {
-                        Picker("", selection: bind(\.ditherMethod)) {
-                            ForEach(DitherMethod.allCases) { m in
-                                Text(m.displayName).tag(m)
+                    // ── Output format ────────────────────────────────────
+                    formField("Output format") {
+                        Picker("", selection: bind(\.outputFormat)) {
+                            Section("Audio") {
+                                ForEach(OutputFormat.audioFormats) { fmt in
+                                    Text(fmt.displayName).tag(fmt)
+                                }
+                            }
+                            Section("Video") {
+                                ForEach(OutputFormat.videoFormats) { fmt in
+                                    Text(fmt.displayName).tag(fmt)
+                                }
                             }
                         }
                         .labelsHidden()
-                        .onChange(of: store.selected.ditherMethod) { _, _ in store.save() }
+                        .onChange(of: store.selected.outputFormat) { _, _ in store.save() }
                     }
 
+                    // ── Audio bitrate (lossy audio / video with audio) ───
+                    if !store.selected.outputFormat.isLossless
+                        && store.selected.outputFormat.supportsAudio {
+                        formField("Audio bitrate") {
+                            Picker("", selection: bind(\.bitrate)) {
+                                Text("64 kbps").tag(64)
+                                Text("96 kbps").tag(96)
+                                Text("128 kbps").tag(128)
+                                Text("192 kbps").tag(192)
+                                Text("256 kbps").tag(256)
+                                Text("320 kbps").tag(320)
+                            }
+                            .labelsHidden()
+                            .onChange(of: store.selected.bitrate) { _, _ in store.save() }
+                        }
+                    }
+
+                    // ── Dither (audio-only lossy formats) ───────────────
+                    if !store.selected.outputFormat.isVideo
+                        && !store.selected.outputFormat.isLossless {
+                        formField("Dither") {
+                            Picker("", selection: bind(\.ditherMethod)) {
+                                ForEach(DitherMethod.allCases) { m in
+                                    Text(m.displayName).tag(m)
+                                }
+                            }
+                            .labelsHidden()
+                            .onChange(of: store.selected.ditherMethod) { _, _ in store.save() }
+                        }
+                    }
+
+                    // ── Video quality / CRF (video formats except GIF) ──
+                    if store.selected.outputFormat.isVideo
+                        && store.selected.outputFormat != .gif {
+                        formField("Video quality (CRF)") {
+                            HStack(spacing: 0) {
+                                Picker("", selection: bind(\.videoCRF)) {
+                                    Text("High").tag(18)
+                                    Text("Medium").tag(23)
+                                    Text("Small file").tag(28)
+                                }
+                                .pickerStyle(.segmented)
+                                .labelsHidden()
+                                .onChange(of: store.selected.videoCRF) { _, _ in store.save() }
+                                Text("CRF \(store.selected.videoCRF)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 54, alignment: .trailing)
+                            }
+                        }
+                    }
+
+                    // ── Output folder ────────────────────────────────────
                     formField("Output folder") {
                         HStack(spacing: 8) {
                             Text(outputFolderLabel)
@@ -131,6 +179,7 @@ struct SettingsSheet: View {
                         }
                     }
 
+                    // ── Filename template ────────────────────────────────
                     formField("Filename template") {
                         VStack(alignment: .leading, spacing: 5) {
                             TextField("{name}", text: bind(\.filenameTemplate))
@@ -138,7 +187,7 @@ struct SettingsSheet: View {
                                 .font(.system(.body, design: .monospaced))
                                 .onSubmit { store.save() }
 
-                            Text("{name}  {bitrate}  {dither}  {date}")
+                            Text("{name}  {bitrate}  {format}  {dither}  {date}")
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
 
@@ -151,9 +200,8 @@ struct SettingsSheet: View {
                 .padding(20)
             }
         }
-        .frame(width: 340)
+        .frame(width: 360)
         .fixedSize(horizontal: true, vertical: false)
-        // Duplicate-name sheet
         .sheet(isPresented: $showNewSheet) {
             duplicateSheet
         }

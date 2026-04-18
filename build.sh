@@ -45,10 +45,10 @@ cat > "$BUNDLE/Contents/Info.plist" << 'PLIST'
     <key>CFBundleExecutable</key>         <string>SimpleMediaConverter</string>
     <key>CFBundleIdentifier</key>         <string>com.vvruspat.simple-media-converter</string>
     <key>CFBundleName</key>               <string>SimpleMediaConverter</string>
-    <key>CFBundleDisplayName</key>        <string>WAV to MP3</string>
+    <key>CFBundleDisplayName</key>        <string>Simple media converter</string>
     <key>CFBundleIconFile</key>           <string>AppIcon</string>
-    <key>CFBundleVersion</key>            <string>2.0</string>
-    <key>CFBundleShortVersionString</key> <string>2.0</string>
+    <key>CFBundleVersion</key>            <string>2.1</string>
+    <key>CFBundleShortVersionString</key> <string>2.1</string>
     <key>NSHighResolutionCapable</key>    <true/>
     <key>LSMinimumSystemVersion</key>     <string>14.0</string>
     <key>NSPrincipalClass</key>           <string>NSApplication</string>

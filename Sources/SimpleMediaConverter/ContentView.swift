@@ -52,7 +52,7 @@ struct BottomBar: View {
                     .background(.quaternary, in: Capsule())
                 }
                 .buttonStyle(.plain)
-                .help("Редактировать пресет")
+                .help("Edit preset")
 
                 // Status
                 Text(statusLine)
@@ -67,7 +67,7 @@ struct BottomBar: View {
                     Text(String(format: "%.0f%%", queue.overallProgress * 100))
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.secondary)
-                    Button("Отмена") { queue.cancelAll() }
+                    Button("Cancel") { queue.cancelAll() }
                         .buttonStyle(.bordered)
                         .tint(.red)
                         .controlSize(.small)
@@ -75,7 +75,7 @@ struct BottomBar: View {
                     Button {
                         queue.startAll(preset: store.selected)
                     } label: {
-                        Label("Конвертировать", systemImage: "play.fill")
+                        Label("Convert", systemImage: "play.fill")
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.regular)
@@ -95,8 +95,8 @@ struct BottomBar: View {
         let total = queue.jobs.count
         let done  = queue.doneCount
         if queue.isRunning { return "\(done)/\(total)" }
-        if done == total   { return "✓ \(total) готово" }
-        return "\(queue.waitingCount) в очереди"
+        if done == total   { return "✓ \(total) done" }
+        return "\(queue.waitingCount) queued"
     }
 
     private var overallTint: Color {

@@ -3,7 +3,7 @@ import SwiftUI
 @main
 struct SimpleMediaConverterApp: App {
     var body: some Scene {
-        WindowGroup("WAV → MP3  v2") {
+        WindowGroup("Simple media converter") {
             ContentView()
         }
         .defaultSize(width: 900, height: 560)
